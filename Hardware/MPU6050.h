@@ -1,0 +1,15 @@
+#ifndef __MPU6050_H
+#define __MPU6050_H
+
+void MPU6050_WriteReg(uint8_t RegAddress, uint8_t Data);
+uint8_t MPU6050_ReadReg(uint8_t RegAddress);
+
+void MPU6050_Init(void);
+uint8_t MPU6050_GetID(void);
+void MPU6050_GetData(void);
+
+void Clear_yaw(void);
+extern float pitch,roll,yaw;
+extern int16_t AX, AY, AZ, GX, GY, GZ;
+extern uint8_t gyro_calibration_done;
+#endif
