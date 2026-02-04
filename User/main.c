@@ -11,88 +11,127 @@ volatile uint8_t data_ready = 0;
 uint8_t Sys_Mode = 0; 
 float Remote_BaseSpeed = 40.0f; // 蓝牙模式基础速度
 
+
 // 蓝牙处理函数
 void Bluetooth_Handle(void)
 {
     if (Serial_RxPacketReady)
     {
-        // 调试回显：开启这个可以看到实际收到了什么，方便排查
-        // 加上 [] 是为了看清有没有多余的空格
-        Serial_Printf("Recv:[%s]\r\n", Serial_RxPacket);
+        char cmd[100];
+        char displayCmd[16] = {0}; // 用于OLED显示
+        int val = 0;
+        
+        // 复制并保证字符串安全
+        strncpy(cmd, (const char *)Serial_RxPacket, sizeof(cmd) - 1);
+        cmd[sizeof(cmd) - 1] = '\0';
+        
+        // 简单转大写 (只转前几个关键字符)
+        for(int i=0; cmd[i] && i<10; i++) {
+            if(cmd[i] >= 'a' && cmd[i] <= 'z') cmd[i] -= 32;
+        }
 
-        if (strncmp(Serial_RxPacket, "SPD:", 4) == 0)
+        Serial_Printf("Recv:[%s]\r\n", cmd);
+
+        // --- 解析指令 ---
+
+        // 1. 设置基础速度 SPD:xx
+        if (strncmp(cmd, "SPD:", 4) == 0)
         {
             float spd = 0;
-            if (sscanf(Serial_RxPacket, "SPD:%f", &spd) == 1)
+            if (sscanf(cmd + 4, "%f", &spd) == 1)
             {
                 Remote_BaseSpeed = spd;
-                Serial_Printf("Speed Set:%.1f\r\n", Remote_BaseSpeed);
+                Serial_Printf("BaseSpeed Set:%.1f\r\n", Remote_BaseSpeed);
+                sprintf(displayCmd, "SPD:%.0f", spd);
             }
         }
-        else if (strcmp(Serial_RxPacket, "FWD") == 0 || strcmp(Serial_RxPacket, "W") == 0)
+        // 2. 前进 FWD 或 FWD:xx
+        else if (strncmp(cmd, "FWD", 3) == 0 || strcmp(cmd, "W") == 0)
         {
-             Basic_Speed = (int)Remote_BaseSpeed;
-             Place_Out = 0;
-             Serial_Printf("FWD\r\n");
-        }
-        // 支持 FWD:50 格式
-        else if (strncmp(Serial_RxPacket, "FWD:", 4) == 0)
-        {
-             int spd = 0;
-            if (sscanf(Serial_RxPacket, "FWD:%d", &spd) == 1)
-            {
-                Basic_Speed = spd;
-                Place_Out = 0;
-                Serial_Printf("FWD Speed:%d\r\n", spd);
+            int target_spd = (int)Remote_BaseSpeed;
+            if (cmd[3] == ':' && sscanf(cmd + 4, "%d", &val) == 1) {
+                target_spd = val;
             }
+            
+            Basic_Speed = target_spd;
+            Place_Out = 0;
+            Serial_Printf("FWD Speed:%d\r\n", target_spd);
+            sprintf(displayCmd, "FWD:%d", target_spd);
         }
-        else if (strcmp(Serial_RxPacket, "BWD") == 0 || strcmp(Serial_RxPacket, "S") == 0)
+        // 3. 后退 BWD 或 BWD:xx
+        else if (strncmp(cmd, "BWD", 3) == 0 || strcmp(cmd, "S") == 0)
         {
-             Basic_Speed = -(int)Remote_BaseSpeed;
-             Place_Out = 0;
-             Serial_Printf("BWD\r\n");
-        }
-        // 支持 BWD:50 格式
-        else if (strncmp(Serial_RxPacket, "BWD:", 4) == 0)
-        {
-             int spd = 0;
-            if (sscanf(Serial_RxPacket, "BWD:%d", &spd) == 1)
-            {
-                Basic_Speed = -spd; // 后退为负速度
-                Place_Out = 0;
-                Serial_Printf("BWD Speed:%d\r\n", spd);
+            int target_spd = (int)Remote_BaseSpeed;
+            if (cmd[3] == ':' && sscanf(cmd + 4, "%d", &val) == 1) {
+                target_spd = val;
             }
+
+            Basic_Speed = -target_spd;
+            Place_Out = 0;
+            Serial_Printf("BWD Speed:%d\r\n", target_spd);
+            sprintf(displayCmd, "BWD:%d", target_spd);
         }
-        else if (strcmp(Serial_RxPacket, "TL") == 0 || strcmp(Serial_RxPacket, "A") == 0)
+        // 4. 左转 TL 或 TL:xx (Turn Left)
+        else if (strncmp(cmd, "TL", 2) == 0 || strcmp(cmd, "A") == 0)
         {
-             Basic_Speed = (int)Remote_BaseSpeed; 
-             Place_Out = 150; // 左转 (根据PID差速逻辑，正值减左轮加速右轮 => 左转)
-             Serial_Printf("Turn Left\r\n");
+            int turn_val = 150; // 默认转向力度
+            if (cmd[2] == ':' && sscanf(cmd + 3, "%d", &val) == 1) {
+                turn_val = val; 
+            }
+            
+            // 转向逻辑：保持基础速度，施加旋转分量
+            Basic_Speed = (Basic_Speed == 0) ? (int)Remote_BaseSpeed : Basic_Speed;
+            Place_Out = turn_val; 
+            Serial_Printf("TurnL Val:%d\r\n", turn_val);
+            sprintf(displayCmd, "TL:%d", turn_val);
         }
-        else if (strcmp(Serial_RxPacket, "TR") == 0 || strcmp(Serial_RxPacket, "D") == 0)
+        // 5. 右转 TR 或 TR:xx (Turn Right)
+        else if (strncmp(cmd, "TR", 2) == 0 || strcmp(cmd, "D") == 0)
         {
-             Basic_Speed = (int)Remote_BaseSpeed;
-             Place_Out = -150; // 右转 (根据PID差速逻辑，负值加左轮减右轮 => 右转)
-             Serial_Printf("Turn Right\r\n");
+            int turn_val = 150; // 默认转向力度
+            if (cmd[2] == ':' && sscanf(cmd + 3, "%d", &val) == 1) {
+                turn_val = val;
+            }
+            
+            Basic_Speed = (Basic_Speed == 0) ? (int)Remote_BaseSpeed : Basic_Speed; 
+            Place_Out = -turn_val;
+            Serial_Printf("TurnR Val:%d\r\n", turn_val);
+            sprintf(displayCmd, "TR:%d", turn_val);
         }
-        else if (strcmp(Serial_RxPacket, "STOP") == 0 || strcmp(Serial_RxPacket, "X") == 0)
+        // 6. 停止 STOP
+        else if (strcmp(cmd, "STOP") == 0 || strcmp(cmd, "X") == 0)
         {
              Basic_Speed = 0;
              Place_Out = 0;
              Serial_Printf("STOP\r\n");
+             sprintf(displayCmd, "STOP");
         }
-        else if (strcmp(Serial_RxPacket, "?") == 0)
+        else if (strcmp(cmd, "HELP") == 0)
         {
-             Serial_Printf("Mode:BT,Speed:%d,Turn:%d\r\n", Basic_Speed, Place_Out);
+             Serial_Printf("CMD: FWD[:v], BWD[:v], TL[:v], TR[:v], SPD:v, STOP\r\n");
+             sprintf(displayCmd, "HELP");
         }
-        else if (strcmp(Serial_RxPacket, "HELP") == 0)
+        else
         {
-             Serial_Printf("Cmds: SPD:xx, FWD, BWD, TL, TR, STOP\r\n");
+            sprintf(displayCmd, "Unk:%.5s", cmd);
         }
         
+        // --- 刷新OLED显示 ---
+        // 清除第3行 (Y=32) 和 第4行 (Y=48)
+        OLED_ClearArea(0, 32, 128, 32); 
+        
+        OLED_ShowString(0, 32, "Cmd:", OLED_8X16);
+        OLED_ShowString(32, 32, displayCmd, OLED_8X16);
+        
+        // 显示当前状态：速度和转向值
+        char status[20];
+        sprintf(status, "V:%d T:%d", Basic_Speed, Place_Out);
+        OLED_ShowString(0, 48, status, OLED_8X16);
+
         Serial_RxPacketReady = 0;
     }
 }
+
 
 
 int main(void)

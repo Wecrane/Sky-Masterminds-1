@@ -1,0 +1,31 @@
+# Keil uVision 5
+*.uvguix.*
+*.uvoptx
+*.uvprojx.bak
+*.dep
+*.map
+*.o
+*.d
+*.crf
+*.iex
+*.htm
+*.sct
+*.lnp
+*.lst
+*.bak
+JLinkLog.txt
+*.axf
+*.build_log.htm
+
+# Build directories
+Objects/
+Listings/
+DebugConfig/
+RTE/
+
+# VS Code
+.vscode/
+
+# Other
+*.rar
+*.zip

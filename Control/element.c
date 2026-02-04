@@ -641,46 +641,12 @@ Motor_SetPWM_R(right_pwm);
         Motor_SetPWM_L(0);
         Motor_SetPWM_R(0);
     }
+
 else if (Patrol_State == 66 && Element_Flag == 0)
 {
         Place_Enable = 1;
         PWM_Enable = 1;
         Basic_Speed = 60;
-        // 防误判：左右转需要连续检测确认
-        static uint8_t idle_left_cnt = 0;
-        static uint8_t idle_right_cnt = 0;
-
-        if (L2 == 1 && L1 == 1)
-        {
-            if (idle_left_cnt < TURN_CONFIRM_COUNT) idle_left_cnt++;
-        }
-        else
-        {
-            idle_left_cnt = 0;
-        }
-
-        if (R2 == 1 && R1 == 1)
-        {
-            if (idle_right_cnt < TURN_CONFIRM_COUNT) idle_right_cnt++;
-        }
-        else
-        {
-            idle_right_cnt = 0;
-        }
-
-        if (idle_left_cnt >= TURN_CONFIRM_COUNT)
-        {
-            idle_left_cnt = 0;
-            Turn_State = 2;
-            Location_per = 0.0f;
-        }
-        else if (idle_right_cnt >= TURN_CONFIRM_COUNT)
-        {
-            idle_right_cnt = 0;
-            Turn_State = 1;
-            Location_per = 0.0f;
-        }
-
 }
 
 }

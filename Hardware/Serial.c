@@ -1,11 +1,14 @@
 #include "myfile.h"
-uint8_t Serial_RxData;
-uint8_t Serial_RxFlag;
+
+#define SERIAL_RX_BUFFER_SIZE 100
+
+volatile uint8_t Serial_RxData;
+volatile uint8_t Serial_RxFlag;
 
 // 新增变量
-char Serial_RxPacket[100];
-uint8_t Serial_RxPacketReady = 0;
-static uint8_t Serial_RxPacketIndex = 0;
+volatile char Serial_RxPacket[SERIAL_RX_BUFFER_SIZE];
+volatile uint8_t Serial_RxPacketReady = 0;
+static volatile uint8_t Serial_RxPacketIndex = 0;
 
 
 /************************串口初始化***************************/
@@ -13,6 +16,8 @@ void Serial_Init(void)
 {
 	 // 开启 GPIOB 时钟
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    // 开启 AFIO 时钟（若后续使用重映射/AF功能）
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     
     // 开启 USART3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);    
@@ -54,8 +59,9 @@ void Serial_Init(void)
 
 void Serial_SendByte(uint8_t Byte)
 {
-	USART_SendData(USART3, Byte);
-	while (USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
+    while (USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
+    USART_SendData(USART3, Byte);
+    while (USART_GetFlagStatus(USART3, USART_FLAG_TC) == RESET);
 }
 
 void Serial_SendArray(uint8_t *Array, uint16_t Length)
@@ -103,10 +109,10 @@ int fputc(int ch, FILE *f)
 
 void Serial_Printf(char *format, ...)
 {
-	char String[100];
+    char String[100];
 	va_list arg;
 	va_start(arg, format);
-	vsprintf(String, format, arg);
+    vsnprintf(String, sizeof(String), format, arg);
 	va_end(arg);
 	Serial_SendString(String);
 }
@@ -130,41 +136,48 @@ void USART3_IRQHandler(void)
 {
 	if (USART_GetITStatus(USART3, USART_IT_RXNE) == SET)
 	{
-		char RxData = USART_ReceiveData(USART3);
+		uint8_t RxData = (uint8_t)USART_ReceiveData(USART3);
 		
         // 现有的单字节处理
         Serial_RxData = RxData;
 		Serial_RxFlag = 1;
 
-        // 字符串包处理 (\r\n 结尾)
-        if (RxData == '\n')
+        // 字符串包处理 (\r 或 \n 结尾)
+        if (Serial_RxPacketReady == 0)
         {
-            // 去除指令尾部的空格（防止指令为 "?   " 导致匹配失败）
-            while (Serial_RxPacketIndex > 0 && Serial_RxPacket[Serial_RxPacketIndex - 1] == ' ')
+            if (RxData == '\n' || RxData == '\r')
             {
-                Serial_RxPacketIndex--;
-            }
-            
-            Serial_RxPacket[Serial_RxPacketIndex] = '\0'; // 添加字符串结束符
-            Serial_RxPacketReady = 1;
-            Serial_RxPacketIndex = 0;
-        }
-        else if (RxData == '\r')
-        {
-            // 收到 \r 忽略
-        }
-        else
-        {
-            // 忽略指令开头的空格（防止上一条指令后的空格污染下一条指令）
-            if (Serial_RxPacketIndex == 0 && RxData == ' ')
-            {
-                // do nothing
+                // 去除指令尾部的空格（防止指令为 "?   " 导致匹配失败）
+                while (Serial_RxPacketIndex > 0 && Serial_RxPacket[Serial_RxPacketIndex - 1] == ' ')
+                {
+                    Serial_RxPacketIndex--;
+                }
+                
+                Serial_RxPacket[Serial_RxPacketIndex] = '\0'; // 添加字符串结束符
+                Serial_RxPacketReady = 1;
+                Serial_RxPacketIndex = 0;
             }
             else
             {
-                Serial_RxPacket[Serial_RxPacketIndex] = RxData;
-                Serial_RxPacketIndex++;
-                if(Serial_RxPacketIndex >= 100) Serial_RxPacketIndex = 0; // 防止溢出
+                // 忽略指令开头的空格（防止上一条指令后的空格污染下一条指令）
+                if (Serial_RxPacketIndex == 0 && RxData == ' ')
+                {
+                    // do nothing
+                }
+                else
+                {
+                    if (Serial_RxPacketIndex < (SERIAL_RX_BUFFER_SIZE - 1))
+                    {
+                        Serial_RxPacket[Serial_RxPacketIndex] = RxData;
+                        Serial_RxPacketIndex++;
+                    }
+                    else
+                    {
+                        // 缓冲区溢出时丢弃当前包并重置
+                        Serial_RxPacketIndex = 0;
+                        Serial_RxPacket[0] = '\0';
+                    }
+                }
             }
         }
 
