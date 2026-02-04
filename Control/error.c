@@ -1,112 +1,100 @@
 #include "myfile.h"
 #include "sensor.h"
 
-/************************´«¸ĞÆ÷Îó²î¼ÆËã***************************/
-// ĞÂÔö½á¹¹ÌåºÍºê¶¨Òå£¨·ÅÔÚÎÄ¼ş¿ªÍ·£©
-#define SENSOR_NUM 5									 //´«¸ĞÆ÷ÊıÁ¿
-#define SENSOR_MAX_ERR      50    		// ´«¸ĞÆ÷×î´óÎó²î
-#define GYRO_SCALE       	  3.5f 			// ½ÇËÙ¶È¡úÎó²îËõ·ÅÏµÊı (Ê¾Àı: 1¡ã/s ¡ú 0.08 error)
-#define FUSION_ALPHA        0.92f		  // »¥²¹ÂË²¨ÏµÊı(0.9-0.98)
-#define DT                  0.005f 	 	// ¿ØÖÆÖÜÆÚ(5ms)
-#define SCALE_FACTOR 10							  // Ëõ·ÅÒò×Ó
-//ÎåÂ·¹âµç¹ÜµÄÈ¨ÖØ
+/************************å‚æ•°é…ç½®***************************/
+#define SENSOR_NUM 5									 //ä¼ æ„Ÿå™¨æ•°é‡
+#define SENSOR_MAX_ERR      50    		// æœ€å¤§é™åˆ¶è¯¯å·®
+#define GYRO_SCALE       	  3.5f 			// 
+#define FUSION_ALPHA        0.92f		  // 
+#define DT                  0.005f 	 	// 
+#define SCALE_FACTOR 10							  // 
+
+//ç”µè·¯å›¾çš„æƒé‡ï¼ˆæ—§ä»£ç ä¿ç•™ï¼‰
 #define L22  -2.8*L2
 #define L11  -1.3*L1
 #define MM   0*M
 #define R11  1.3*R1
 #define R22  2.8*R2
 
-/* **************** ½á¹¹Ìå **************** */
+/* **************** ç»“æ„ä½“ **************** */
 typedef struct 
 {
-    float integrated_err; // ÍÓÂİÒÇ»ı·ÖÎó²î
-    int last_sensor_err;  // ÉÏ´Î´«¸ĞÆ÷Îó²î
+    float integrated_err; 
+    int last_sensor_err;  
 } FusionState;
-typedef struct   //ÓÃÓÚ¶¨Òå½á¹¹ÌåÀàĞÍ¡£½á¹¹ÌåÊÇÒ»ÖÖÓÃ»§×Ô¶¨ÒåµÄÊı¾İÀàĞÍ£¬¿ÉÒÔ½«¶à¸öÊı¾İÏî£¨³ÉÔ±£©×éºÏÔÚÒ»Æğ¡£ÔÚÕâÀï£¬typedef ÊÇ½«½á¹¹Ìå¶¨ÒåµÄÀàĞÍÃüÃûÎª SensorMap£¬ÒÔ±ãºóĞøÊ¹ÓÃ¡£
+
+typedef struct   
 {
-    float position;  // ´«¸ĞÆ÷Î»ÖÃ×ø±ê£¨ÏßĞÔ·Ö²¼£©
-    float channel;  // ´«¸ĞÆ÷¶ÔÓ¦µÄÍ¨µÀºÅ
+    float position;  
+    float channel;  
 } SensorMap;
 
-/* **************** È«¾Ö±äÁ¿ **************** */
+/* **************** å…¨å±€å˜é‡ **************** */
 static FusionState fstate = {0, 0};
 int i1,i2,i3,i4,i5,err=0;
 
-// ¸ù¾İ´«¸ĞÆ÷ÎïÀíÎ»ÖÃ¶¨Òå×ø±ê£¨¼ÙÉèÏßĞÔÅÅÁĞ£©
-static const SensorMap sensorMap[SENSOR_NUM] =   //Êı×éÊÇÒ»¸ö³£Á¿Êı×é£¬ÇÒÖ»ÄÜÔÚ¶¨ÒåËüµÄÎÄ¼ş»ò´úÂë¶ÎÄÚ·ÃÎÊ¡£const ±íÃ÷Êı×éÖĞµÄÔªËØÖµ²»¿ÉĞŞ¸Ä¡£
+// ä¼ æ„Ÿå™¨é€šé“ä¸æƒé‡æ˜ å°„
+// channel å¯¹åº” digital() å‡½æ•°çš„å‚æ•°: 1=L2, 2=L1, 3=M, 4=R1, 5=R2
+static const SensorMap sensorMap[SENSOR_NUM] = 
 {
-    {-2.8, 1}, // L2
+    {-6.0, 1}, // L2 (å·²å¢åŠ å¤–ä¾§æƒé‡ï¼Œä¾¿äºç›´è§’å…¥å¼¯)
     {-1.3, 2}, // L1	
-    { 0, 3}, // M 
+    { 0, 3},   // M 
     { 1.3, 4}, // R1
-    { 2.8, 5}  // R2	
+    { 6.0, 5}  // R2 (å·²å¢åŠ å¤–ä¾§æƒé‡)
 };
 
 
-/* ****************¼ÆËã´«¸ĞÆ÷Æ«²î **************** */
+/* **************** è¯¯å·®è®¡ç®—æ ¸å¿ƒç®—æ³• **************** */
 int Error_Calcaulate()
 {		
 	int active_sum = 0;
 	int active_count = 0;
-	 for (int i = 0; i < SENSOR_NUM; i++) 		
+    int outer_sensor_triggered = 0; // æ ‡è®°æ˜¯å¦æœ‰å¤–ä¾§ä¼ æ„Ÿå™¨è§¦å‘
+
+	for (int i = 0; i < SENSOR_NUM; i++) 		
 	{
-            if (digital(sensorMap[i].channel))  		//digital µÄº¯Êı£¬´«Èë´«¸ĞÆ÷µÄÍ¨µÀºÅ¡£
-						{
-                active_sum += sensorMap[i].position; // ÀÛ¼Ó¼¤»î´«¸ĞÆ÷µÄÎ»ÖÃ
-                active_count++; 										 //ÔÚÑ­»·ÖĞ£¬active_count »áÔÚÃ¿¸ö¼¤»îµÄ´«¸ĞÆ÷Ê±Ôö¼Ó 1£º
-						}
-   }
+        // digitalè¿”å›1ä»£è¡¨æ£€æµ‹åˆ°é»‘çº¿
+        if (digital((unsigned char)sensorMap[i].channel)) 
+        {
+            active_sum += (int)sensorMap[i].position; 
+            active_count++; 
+
+            // æ£€æŸ¥æ˜¯å¦ä¸ºæœ€å¤–ä¾§ä¼ æ„Ÿå™¨ (L2 index=0 æˆ– R2 index=4)
+            if (i == 0 || i == 4) {
+                outer_sensor_triggered = 1;
+            }
+        }
+    }
 	
-				err = active_count ? (active_sum * SCALE_FACTOR) / active_count : 0;	//ÕâÀïÊÇ×îÖÕÊä³öerrºóÈ»ºóÏŞ·ù£¬Ö»ÊÇ±È½Ï¸´ÔÓµÄĞ´·¨
-				err = err*Right_err();				//Ö±½ÇÆ«²î·Å´ó
+    // åŸºç¡€åŠ æƒå¹³å‡
+    err = active_count ? (active_sum * SCALE_FACTOR) / active_count : 0;
+    
+    // --- ç›´è§’/æ€¥å¼¯ç­–ç•¥ ---
+    // å¦‚æœå¤–ä¾§ä¼ æ„Ÿå™¨è§¦å‘ï¼Œè¯´æ˜å¤„äºå¼¯é“è¾¹ç¼˜ï¼Œéœ€è¦æå¤§çš„è½¬å‘åŠ›ã€‚
+    // éçº¿æ€§æ”¾å¤§è¯¯å·®
+    if (outer_sensor_triggered)
+    {
+        // æ”¾å¤§å€æ•°ï¼Œç¡®ä¿èƒ½å¤Ÿäº§ç”Ÿè¶³å¤Ÿçš„å·®é€Ÿ
+        err = (int)(err * 2.0f); 
+    }
+    
 	return err;           
 }
 
 
-
-/* **************** ÍÓÂİÒÇ¸¨Öú¼ÆËã **************** */
+/* **************** è¿™ä¸ªå‡½æ•°ä¿ç•™åŸæ ·ï¼Œè™½ç„¶åªè¿”å› sensor_err **************** */
 int get_fused_error(int sensor_err, float gyro_z) 
 {
-//    /**** ²½Öè1£ºÍÓÂİÒÇ»ı·Ö´¦Àí ****/
-//	
-//    float delta_err = gyro_z*GYRO_SCALE;// ½«½ÇËÙ¶È·Å´ó
-//    
-//    // »ı·Ö¼ÆËã£¨¼ÙÉèµ÷ÓÃÖÜÆÚÎªdtÃë£©
-//    float dt = 0.01f; // 1msÖÜÆÚ£¨ÎÒµÄÊµ¼ÊÖÜÆÚÊÇ5msÕâÀïÎÒÏ£ÍûËû»ı·Ö¿ìÒ»µã£©
-//    fstate.integrated_err += delta_err * dt;
-//    
-//    /**** ²½Öè2£º»¥²¹ÂË²¨ÈÚºÏ ****/
-//    int fused_err = 0;
-//    if( sensor_err!=0||digital(3)==1) 
-//		{			
-//				// Çé¿öA£ºÓĞ´«¸ĞÆ÷ĞÅºÅÊ±£¬ÖØÖÃ»ı·Ö£¬ÖØÖÃ·½Ê½Îª0.4µÄ´«¸ĞÆ÷0.6µÄÍÓÂİÒÇ¡£
-//        fstate.integrated_err = fstate.integrated_err * 0.6f + sensor_err * 0.4f;
-////		fstate.last_sensor_err = sensor_err;		
-//		fused_err=(1-FUSION_ALPHA)* fstate.integrated_err + FUSION_ALPHA*sensor_err;
-//    } 
-//		
-//				// Çé¿öB£ºÎŞ´«¸ĞÆ÷ĞÅºÅÊ±£¬ĞÅÈÎÍÓÂİÒÇ
-//		else
-//		{
-//				fused_err= fstate.integrated_err;			//Ã»ÓĞ´«¸ĞÆ÷µÄÊ±ºò£¬ÍÓÂİÒÇÎª²»¶Ï»ı·Ö£¬Îó²îÒ»Ö±±ä´ó
-//		}
-//		 /**** ²½Öè4£ºÏŞ·ù´¦Àí ****/
-//			//ºÍifµÄËã·¨ÊÇÒ»ÑùµÄÖ»ÊÇÕâÑùĞ´¸ü¼ò±ã
-//			fused_err = (fused_err > SENSOR_MAX_ERR) ? SENSOR_MAX_ERR : ((fused_err < -SENSOR_MAX_ERR) ? -SENSOR_MAX_ERR : fused_err);
-
-//    return (int)fused_err;
+    // ç›®å‰æ­¤å‡½æ•°ä»…é€ä¼  sensor_errï¼Œå¦‚æœéœ€è¦é™€èºä»ªèåˆå¯ä»¥åœ¨è¿™é‡Œæ‰“å¼€é€»è¾‘
 	return sensor_err;
 }
 
-/* **************** Ö±½Ç·Å´óÆ«²î **************** */
+/* **************** å…¼å®¹æ€§ä¿ç•™ **************** */
 float Right_err()
 {
-	if(R2==0&&M==1&&L1==1&&L2==1)//×óÖ±½Ç
-		{return 27.0f;}
-	else if(L2==0&&M==1&&R1==1&&R2==1)//ÓÒÖ±½Ç
-		{return 27.0f;}
-	else 
-		{return 1.0f;}
+    // é€»è¾‘å·²ç»ç§»å…¥ Error_Calcaulate
+	return 1.0f;
 }
 
 

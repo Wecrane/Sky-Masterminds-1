@@ -1,74 +1,74 @@
 #include "myfile.h"
-/************************È«¾Ö±äÁ¿***************************/
-uint8_t Place_Enable,PWM_Enable=1;//£¨×ªÏò»·ºÍËÙ¶È»·µÄÊ¹ÄÜ¿ª¹Ø£©
-int Speed_Out_L,Speed_Out_R,Place_Out=0;//Á½¸ö»·µÄÊä³ö
+/************************å…¨å˜é‡***************************/
+uint8_t Place_Enable,PWM_Enable=1;//è½¬å‘ç¯å’Œé€Ÿåº¦ç¯æ€»ä½¿èƒ½å¼€å…³
+int Speed_Out_L,Speed_Out_R,Place_Out=0;//
 int sensor_err,final_err=0;
 float straight_err;
 
-/************************PIDµ÷½ÚÇø***************************/
-int Basic_Speed=0;    //»ù´¡ËÙ¶È£¬ÔÚÕâÀïĞŞ¸ÄËÙ¶È£¬µ«ÊÇÔªËØÒªÏÈ×¢ÊÍµô
-float Turn_factor=0.5;
+/************************PIDå‚æ•°***************************/
+int Basic_Speed=0;    //åŸºç¡€é€Ÿåº¦
+float Turn_factor=0.5; 
 int Left_Speed,Right_Speed=0;
 int Speed_PID[3] = {250,0,30}; 
-float Place_PD[2] = {5.3,4.3};
+
+
+float Place_PD[2] = {5.3, 4.3};
 
 void Control()
 {
-			// »ñÈ¡´«¸ĞÆ÷¼ÓÈ¨Îó²î£¨Ô­ÓĞËã·¨£©
+			// è·å–ä¼ æ„Ÿå™¨åŠ æƒè¯¯å·®
 			sensor_err = Error_Calcaulate(); 
 	
-			// ¼ÆËãÈÚºÏÎó²î	
+			// èåˆé™€èºä»ªï¼ˆç›®å‰ä»…é€ä¼ ï¼‰
 			final_err = get_fused_error(sensor_err,GZ);
 	
-			//×ªÏò»·
+			// è½¬å‘PDè®¡ç®—
 			if(Place_Enable)
 			{
 				Place_Out=(int)Place_Control(final_err,0,Place_PD);
 			}
 			
-			//ÔªËØ´¦Àí£¬Ò»¿ªÊ¼µ÷³µµÄÊ±ºòÏÈ¹Øµô
+			// å…ƒç´ å¤„ç†é€»è¾‘
 			Element_Process();
-			//»ñÈ¡±àÂëÆ÷Öµ
+			// è¯»å–ç¼–ç å™¨
 			Encoder_Read();
 			
-			//×ªÏò´¦Àí
+			// è®¡ç®—å·¦å³è½®ç›®æ ‡é€Ÿåº¦ (å åŠ è½¬å‘å·®é€Ÿ)
 			Different_Speed();
 			
-			//ËÙ¶È»·
+			// é€Ÿåº¦ç¯PIDè®¡ç®—
 			Speed_Out_L=PID_Control_L(Speed_L,Left_Speed,Speed_PID); 
 			Speed_Out_R=PID_Control_R(Speed_R,Right_Speed,Speed_PID);
 	
-			//Êä³öÏŞ·ù
+			// é™å¹…
 			Speed_Out_L=Min_Max( Speed_Out_L ,-Max_PWM, Max_PWM );
 			Speed_Out_R=Min_Max( Speed_Out_R ,-Max_PWM, Max_PWM );
 			
-			//½«pwmÊä³öµ½µç»úÉÏ
+			// è¾“å‡ºPWM
 			if(PWM_Enable)
   		{
 				Motor_SetPWM_L(Speed_Out_L);
 				Motor_SetPWM_R(Speed_Out_R);
-//			Motor_SetPWM_L(2000);
-//			Motor_SetPWM_R(2000);
 			}
 			 
 }
 
 
-/************************Î»ÖÃÊ½×ªÏò»·pd***************************/
-float Place_Control(float NowPoint, float SetPoint, float *TURN_PID) //PD¿ØÖÆÎ»ÖÃ»·
+/************************ä½ç½®å¼è½¬å‘PD***************************/
+float Place_Control(float NowPoint, float SetPoint, float *TURN_PID) 
 {
-	static float LastError = 0; // ¾²Ì¬±äÁ¿±£³ÖÀúÊ·Öµ
+	static float LastError = 0; 
 	float KP, KD; 
 	float NowError, Out; 
-	NowError = SetPoint - NowPoint; // µ±Ç°Îó²î 
+	NowError = SetPoint - NowPoint; 
 	KP = *TURN_PID; 
 	KD = *(TURN_PID+1); 
-	Out = KP * NowError + KD *(NowError-LastError); // PID Êä³öÖµ 
-	LastError = NowError; //¸üĞÂÎó²î 
+	Out = KP * NowError + KD *(NowError-LastError);
+	LastError = NowError; 
 	return Out; 
 }
 
-/************************Î»ÖÃÊ½ËÙ¶È»·pd (×óÂÖ)***************************/
+/************************ä½ç½®å¼é€Ÿåº¦ç¯L (å¢é‡å¼æ›´å¸¸ç”¨ï¼Œä½†è¿™é‡Œæ˜¯ä½ç½®å¼)***************************/
 int PID_Control_L(int NowPoint, int SetPoint, int *TURN_PID) 
 {
 	  static int Integral = 0, LastError = 0; 
@@ -79,13 +79,12 @@ int PID_Control_L(int NowPoint, int SetPoint, int *TURN_PID)
 	
     NowError = SetPoint - NowPoint;
     
-		//ÕâÀïpi¡¢pdÎÒ¶¼ÊÔ¹ıÁËpdĞ§¹û¸üºÃÒ»µã
     Out = KP * NowError + KI * Integral+KD *(NowError-LastError);
-    LastError = NowError; // ¸üĞÂÎó²î (Ô­À´´úÂëÈ±ÁËÕâĞĞ£¿²»£¬Ö®Ç°µÄ´úÂëÀïºÃÏñÒ²Ã»ÓĞ¸üĞÂLastError£¿)
+    LastError = NowError; 
     return Out;
 }
 
-/************************Î»ÖÃÊ½ËÙ¶È»·pd (ÓÒÂÖ)***************************/
+/************************ä½ç½®å¼é€Ÿåº¦ç¯R***************************/
 int PID_Control_R(int NowPoint, int SetPoint, int *TURN_PID) 
 {
 	  static int Integral = 0, LastError = 0; 
@@ -96,28 +95,29 @@ int PID_Control_R(int NowPoint, int SetPoint, int *TURN_PID)
 	
     NowError = SetPoint - NowPoint;
     
-		//ÕâÀïpi¡¢pdÎÒ¶¼ÊÔ¹ıÁËpdĞ§¹û¸üºÃÒ»µã
-    Out = KP * NowError + KI * Integral+KD *(NowError-LastError);
+    Out = KP * NowError + KI * Integral + KD *(NowError-LastError);
     LastError = NowError;
     return Out;
 }
 
-/************************²îËÙ¼ÆËã***************************/
+/************************å·®é€Ÿåˆ†é…***************************/
 void Different_Speed() 
 { 
  float k;  
- //×ªÏò»·µÄÊä³ö
- //Êä³öµÄËÙ¶ÈÈ¡¾öÓÚ»ù´¡ËÙ¶ÈµÄ´óĞ¡£¬ËùÒÔËÙ¶È¿ìÁËÖ®ºó×ªÏòÁ¦¶ÈÒ²»á¸ú×Å±ä´ó
+ // æ ¹æ®PIDè®¡ç®—å‡ºçš„è½¬å‘è¾“å‡º Place_Outï¼Œåˆ†é…ç»™å·¦å³è½®
+ // ç³»æ•° 0.01 æ˜¯ä¸ºäº†å°† Place_Out å½’ä¸€åŒ–åˆ° k æ¯”ä¾‹
  if(Place_Out >= 0) 
-	 {
-		 k = Place_Out * 0.01; 
-		 Left_Speed = Basic_Speed * (1 - k); 
-		 Right_Speed = Basic_Speed * (1 + k*Turn_factor); 
-	 } 
-	 else 
-	{ 
-	 k = -Place_Out * 0.01; 
-	 Left_Speed = Basic_Speed * (1 + k*Turn_factor); 
-	 Right_Speed = Basic_Speed * (1 - k); 
+ {
+     // éœ€è¦å·¦è½¬ï¼šå‡å·¦è½®ï¼ŒåŠ å³è½®
+     k = Place_Out * 0.01f; 
+     Left_Speed = Basic_Speed * (1 - k); 
+     Right_Speed = Basic_Speed * (1 + k*Turn_factor); 
+ } 
+ else 
+ { 
+     // éœ€è¦å³è½¬ï¼šå‡å³è½®ï¼ŒåŠ å·¦è½®
+     k = -Place_Out * 0.01f; 
+     Left_Speed = Basic_Speed * (1 + k*Turn_factor); 
+     Right_Speed = Basic_Speed * (1 - k); 
   } 
 }

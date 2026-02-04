@@ -641,12 +641,12 @@ Motor_SetPWM_R(right_pwm);
         Motor_SetPWM_L(0);
         Motor_SetPWM_R(0);
     }
-
 else if (Patrol_State == 66 && Element_Flag == 0)
 {
         Place_Enable = 1;
         PWM_Enable = 1;
         Basic_Speed = 60;
+
 }
 
 }
