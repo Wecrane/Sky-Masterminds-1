@@ -10,7 +10,6 @@
       <TargetName>Target 1</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pArmCC>5060960::V5.06 update 7 (build 960)::.\ARMCC</pArmCC>
       <pCCUsed>5060960::V5.06 update 7 (build 960)::.\ARMCC</pCCUsed>
       <uAC6>0</uAC6>
       <TargetOption>
@@ -53,7 +52,7 @@
           <OutputName>Project</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>0</CreateHexFile>
+          <CreateHexFile>1</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -135,11 +134,11 @@
             <RunIndependent>0</RunIndependent>
             <UpdateFlashBeforeDebugging>1</UpdateFlashBeforeDebugging>
             <Capability>1</Capability>
-            <DriverSelection>-1</DriverSelection>
+            <DriverSelection>4096</DriverSelection>
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
-          <Flash3></Flash3>
+          <Flash3>"" ()</Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -330,8 +329,8 @@
             <uC99>1</uC99>
             <uGnu>0</uGnu>
             <useXO>0</useXO>
-            <v6Lang>1</v6Lang>
-            <v6LangP>1</v6LangP>
+            <v6Lang>3</v6Lang>
+            <v6LangP>3</v6LangP>
             <vShortEn>1</vShortEn>
             <vShortWch>1</vShortWch>
             <v6Lto>0</v6Lto>
@@ -716,11 +715,6 @@
               <FilePath>.\Hardware\MPU6050.h</FilePath>
             </File>
             <File>
-              <FileName>MPU6050_Reg.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Hardware\MPU6050_Reg.h</FilePath>
-            </File>
-            <File>
               <FileName>MyI2C.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Hardware\MyI2C.c</FilePath>
@@ -756,11 +750,6 @@
               <FilePath>.\Hardware\Encoder.c</FilePath>
             </File>
             <File>
-              <FileName>Encoder.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Hardware\Encoder.h</FilePath>
-            </File>
-            <File>
               <FileName>sensor.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Hardware\sensor.c</FilePath>
@@ -776,6 +765,16 @@
               <FilePath>.\Hardware\Key.c</FilePath>
             </File>
             <File>
+              <FileName>Encoder.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\Encoder.h</FilePath>
+            </File>
+            <File>
+              <FileName>MPU6050_Reg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\MPU6050_Reg.h</FilePath>
+            </File>
+            <File>
               <FileName>Key.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Hardware\Key.h</FilePath>
@@ -789,16 +788,6 @@
               <FileName>Serial.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Hardware\Serial.h</FilePath>
-            </File>
-            <File>
-              <FileName>kalman.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Hardware\kalman.c</FilePath>
-            </File>
-            <File>
-              <FileName>kalman.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Hardware\kalman.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -861,16 +850,6 @@
               <FilePath>.\Control\pid.h</FilePath>
             </File>
             <File>
-              <FileName>menu.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Control\menu.c</FilePath>
-            </File>
-            <File>
-              <FileName>menu.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Control\menu.h</FilePath>
-            </File>
-            <File>
               <FileName>element.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Control\element.c</FilePath>
@@ -879,6 +858,16 @@
               <FileName>element.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Control\element.h</FilePath>
+            </File>
+            <File>
+              <FileName>mode_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Control\mode_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>mode_control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Control\mode_control.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -891,14 +880,5 @@
     <components/>
     <files/>
   </RTE>
-
-  <LayerInfo>
-    <Layers>
-      <Layer>
-        <LayName>Project</LayName>
-        <LayPrjMark>1</LayPrjMark>
-      </Layer>
-    </Layers>
-  </LayerInfo>
 
 </Project>

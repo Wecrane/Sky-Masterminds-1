@@ -1,143 +1,164 @@
-#include "myfile.h"          // ÏîÄ¿Ö÷Í·ÎÄ¼þ
+#include "myfile.h"
 #include <math.h>
-
-// È«¾Ö±äÁ¿£¨¹©Íâ²¿·ÃÎÊ£©
-float yaw;                  // ÀÛ»ýÆ«º½½Ç£¨¡ã£©
-int16_t AX, AY, AZ, GX, GY, GZ;  // Ô­Ê¼´«¸ÐÆ÷Êý¾Ý£¨¼æÈÝÆäËûÄ£¿é£©
-
-// MPU6050ÅäÖÃ²ÎÊý
-#define MPU6050_ADDRESS     0xD0    // I2CµØÖ·
-#define GYRO_SCALE_FACTOR   16.4f   // ¡À2000¡ã/sÁ¿³ÌÏÂµÄ×ª»»ÏµÊý£¨LSB/(¡ã/s)£©
-static const float dt = 0.05f;    // ²ÉÑùÖÜÆÚ£¨50ms£¬ÓëÊµ¼Ê¿ØÖÆÖÜÆÚÒ»ÖÂ£©
-uint8_t gyro_calibration_done = 0; // Ð£×¼Íê³É±êÖ¾
-
-/**
- * MPU6050Ð´¼Ä´æÆ÷
- */
+float pitch,roll,yaw;
+int16_t AX, AY, AZ, GX, GY, GZ;
+// È«ï¿½Ö±ï¿½ï¿½ï¿½
+float gyro_zero_z = 0.0f;
+float yaw_angle = 0.0f;
+float last_gyro_z = 0.0f;
+float dt = 0.010f;
+float gyro_z=0.0f;
+#define MPU6050_ADDRESS		0xD0
 void MPU6050_WriteReg(uint8_t RegAddress, uint8_t Data)
 {
-    MyI2C_Start();
-    MyI2C_SendByte(MPU6050_ADDRESS);
-    MyI2C_ReceiveAck();
-    MyI2C_SendByte(RegAddress);
-    MyI2C_ReceiveAck();
-    MyI2C_SendByte(Data);
-    MyI2C_ReceiveAck();
-    MyI2C_Stop();
+	MyI2C_Start();
+	MyI2C_SendByte(MPU6050_ADDRESS);
+	MyI2C_ReceiveAck();
+	MyI2C_SendByte(RegAddress);
+	MyI2C_ReceiveAck();
+	MyI2C_SendByte(Data);
+	MyI2C_ReceiveAck();
+	MyI2C_Stop();
 }
 
-/**
- * MPU6050¶Á¼Ä´æÆ÷
- */
 uint8_t MPU6050_ReadReg(uint8_t RegAddress)
 {
-    uint8_t Data;
-    MyI2C_Start();
-    MyI2C_SendByte(MPU6050_ADDRESS);
-    MyI2C_ReceiveAck();
-    MyI2C_SendByte(RegAddress);
-    MyI2C_ReceiveAck();
-    
-    MyI2C_Start();
-    MyI2C_SendByte(MPU6050_ADDRESS | 0x01);
-    MyI2C_ReceiveAck();
-    Data = MyI2C_ReceiveByte();
-    MyI2C_SendAck(1);  // ·¢ËÍ·ÇÓ¦´ð
-    MyI2C_Stop();
-    return Data;
+	uint8_t Data;
+	
+	MyI2C_Start();
+	MyI2C_SendByte(MPU6050_ADDRESS);
+	MyI2C_ReceiveAck();
+	MyI2C_SendByte(RegAddress);
+	MyI2C_ReceiveAck();
+	
+	MyI2C_Start();
+	MyI2C_SendByte(MPU6050_ADDRESS | 0x01);
+	MyI2C_ReceiveAck();
+	Data = MyI2C_ReceiveByte();
+	MyI2C_SendAck(1);
+	MyI2C_Stop();
+	
+	return Data;
 }
 
-/**
- * MPU6050³õÊ¼»¯£¨½öÅäÖÃZÖáÏà¹Ø²ÎÊý£©
- */
 void MPU6050_Init(void)
 {
-    MyI2C_Init();
-    Delay_ms(100);  // µÈ´ý´«¸ÐÆ÷ÉÏµçÎÈ¶¨
-    
-    // ¸´Î»´«¸ÐÆ÷
-    MPU6050_WriteReg(0x6B, 0x80);
-    Delay_ms(100);
-    // »½ÐÑ´«¸ÐÆ÷£¨Ê¹ÓÃÄÚ²¿8MHzÊ±ÖÓ£©
-    MPU6050_WriteReg(0x6B, 0x00);
-    Delay_ms(10);
-    
-    // ÅäÖÃ²ÉÑùÂÊºÍÂË²¨£¨Õë¶ÔZÖáÓÅ»¯£©
-    MPU6050_WriteReg(0x19, 0x31);  // SMPLRT_DIV=49 ¡ú ²ÉÑùÂÊ=20Hz£¨50ms/´Î£©
-    MPU6050_WriteReg(0x1A, 0x02);  // CONFIG=2 ¡ú DLPF½ØÖ¹94Hz
-    MPU6050_WriteReg(0x1B, 0x18);  // GYRO_CONFIG=0x18 ¡ú ÍÓÂÝÒÇÁ¿³Ì¡À2000¡ã/s
-    MPU6050_WriteReg(0x1C, 0x00);  // ACCEL_CONFIG=0 ¡ú ¼ÓËÙ¶È¼ÆÁ¿³Ì¡À2g
-    
-    // ³õÊ¼»¯±äÁ¿
-    yaw = 0.0f;
-    AX = AY = AZ = GX = GY = GZ = 0;
+	MyI2C_Init();
+	Delay_ms(100);
+	MPU6050_WriteReg(MPU6050_PWR_MGMT_1, 0x01);
+	MPU6050_WriteReg(MPU6050_PWR_MGMT_2, 0x00);
+	MPU6050_WriteReg(MPU6050_SMPLRT_DIV, 0x09);
+	MPU6050_WriteReg(MPU6050_CONFIG, 0x06);
+	MPU6050_WriteReg(MPU6050_GYRO_CONFIG, 0x18);
+	MPU6050_WriteReg(MPU6050_ACCEL_CONFIG, 0x18);
+	Delay_ms(2000);
 }
 
-/**
- * ¶ÁÈ¡ZÖáÊý¾Ý²¢¸üÐÂyaw£¨ºËÐÄº¯Êý£©
- */
-void MPU6050_GetData(void)
+uint8_t MPU6050_GetID(void)
 {
-    uint8_t Data[2];  // ´æ´¢ZÖáÔ­Ê¼Êý¾Ý£¨¸ß8Î»+µÍ8Î»£©
+	return MPU6050_ReadReg(MPU6050_WHO_AM_I);
+}
+
+void MPU6050_GetData(int16_t *GyroZ )
+{
+	// ï¿½ï¿½ MPU6050 ï¿½ï¿½È¡Ô­Ê¼ï¿½ï¿½ï¿½Ù¶ÈºÍ½ï¿½ï¿½Ù¶ï¿½ï¿½ï¿½ï¿½ï¿½
+uint8_t DataH, DataL;
+
+//// ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ù¶ï¿½Öµ
+//DataH = MPU6050_ReadReg(MPU6050_ACCEL_XOUT_H);
+//DataL = MPU6050_ReadReg(MPU6050_ACCEL_XOUT_L);
+//*AccX = (DataH << 8) | DataL;
+
+
+//DataH = MPU6050_ReadReg(MPU6050_ACCEL_YOUT_H);
+//DataL = MPU6050_ReadReg(MPU6050_ACCEL_YOUT_L);
+//*AccY = (DataH << 8) | DataL;
+
+
+//DataH = MPU6050_ReadReg(MPU6050_ACCEL_ZOUT_H);
+//DataL = MPU6050_ReadReg(MPU6050_ACCEL_ZOUT_L);
+//*AccZ = (DataH << 8) | DataL;
+
+//// ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ù¶ï¿½Öµ
+//DataH = MPU6050_ReadReg(MPU6050_GYRO_XOUT_H);
+//DataL = MPU6050_ReadReg(MPU6050_GYRO_XOUT_L);
+//*GyroX = (DataH << 8) | DataL;
+
+
+//DataH = MPU6050_ReadReg(MPU6050_GYRO_YOUT_H);
+//DataL = MPU6050_ReadReg(MPU6050_GYRO_YOUT_L);
+//*GyroY = (DataH << 8) | DataL;
+
+
+DataH = MPU6050_ReadReg(MPU6050_GYRO_ZOUT_H);
+DataL = MPU6050_ReadReg(MPU6050_GYRO_ZOUT_L);
+*GyroZ= ((DataH << 8) | DataL);	//Êµï¿½Ê½ï¿½ï¿½Ù¶ï¿½
+		
+}
+
+void Clear_yaw(void) 
+{
+    yaw = 0.0f;  // ç›´æŽ¥æ¸…é›¶
+}
+
+// é™€èžºä»ªé›¶ç‚¹æ ¡å‡† - é‡‡é›†å¤šæ¬¡å–å¹³å‡å€¼
+void calibrate_gyro(void)
+{
+    float sum = 0;
+    int16_t gz_raw; 
+    int valid_count = 0;
     
-    // ¶ÁÈ¡ÍÓÂÝÒÇZÖáÊý¾Ý£¨¼Ä´æÆ÷0x47=GYRO_ZOUT_H£¬0x48=GYRO_ZOUT_L£©
-    MyI2C_Start();
-    MyI2C_SendByte(MPU6050_ADDRESS);
-    MyI2C_ReceiveAck();
-    MyI2C_SendByte(0x47);  // ÆðÊ¼¼Ä´æÆ÷µØÖ·
-    MyI2C_ReceiveAck();
-    
-    MyI2C_Start();
-    MyI2C_SendByte(MPU6050_ADDRESS | 0x01);  // ¶Á²Ù×÷
-    MyI2C_ReceiveAck();
-    
-    // Á¬Ðø¶ÁÈ¡2×Ö½Ú
-    for (uint8_t i = 0; i < 2; i++) {
-        Data[i] = MyI2C_ReceiveByte();
-        MyI2C_SendAck((i == 1) ? 1 : 0);  // ×îºóÒ»×Ö½Ú·¢·ÇÓ¦´ð
+    // é‡‡é›†100æ¬¡æ•°æ®å–å¹³å‡ï¼ˆçº¦1ç§’ï¼‰
+    for(int i = 0; i < 100; i++) 
+    {    
+        MPU6050_GetData(&gz_raw);
+        sum += gz_raw;
+        valid_count++;
+        Delay_ms(10);  // ç­‰å¾…10ms
     }
-    MyI2C_Stop();
     
-    // ½âÎöZÖáÔ­Ê¼Êý¾Ý£¨16Î»ÓÐ·ûºÅÕûÊý£©
-    GZ = (int16_t)(Data[0] << 8) | Data[1];
+    // è®¡ç®—é›¶ç‚¹åç§»
+    if(valid_count > 0)
+    {
+        gyro_zero_z = sum / valid_count;
+    }
     
-    // ÍÓÂÝÒÇZÖáÁãÆ«Ð£×¼£¨Ê×´ÎÉÏµçÖ´ÐÐ£©
-    static uint8_t gyro_calibrated = 0;
-    static float gyro_offset_z = 0.0f;  // ZÖáÁãÆ«£¨¡ã/s£©
+    // æ¸…é™¤yaw
+    yaw = 0.0f;
+    last_gyro_z = 0.0f;
+}
+
+// ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ù¶È²ï¿½ï¿½ï¿½ï¿½ï¿½
+void update_yaw(void)
+{
+    static int16_t gz_raw;
     
-    if (!gyro_calibrated) {
-        static uint16_t count = 0;
-        static float sum_gz = 0.0f;
-        
-        // ÀÛ»ý100´ÎÔ­Ê¼Êý¾Ý£¨Ô¼500ms£©
-        sum_gz += (float)GZ;
-        count++;
-        
-        if (count >= 100) {
-            // ¼ÆËãÁãÆ«£¨×ª»»Îª¡ã/s£©
-            gyro_offset_z = (sum_gz / 100.0f) / GYRO_SCALE_FACTOR;
-            gyro_calibrated = 1;
-            gyro_calibration_done = 1;  // Ð£×¼Íê³É±êÖ¾ÖÃÎ»
-            yaw = 0.0f;  // ³õÊ¼»¯yaw
+    MPU6050_GetData(&gz_raw);
+    
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¯
+    gyro_z =(((float)gz_raw - gyro_zero_z) / 16.4f);
+    
+    // ï¿½ï¿½ï¿½ï¿½
+    if(fabs(gyro_z) < 0.5f) gyro_z = 0;
+      
+    // ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½
+    yaw += (last_gyro_z + gyro_z) / 2 * dt;
+	
+    last_gyro_z = gyro_z;
+    
+}
+
+
+// ï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½ï¿½òµ¥µï¿½Ñ­ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½
+void Simple_Delay_ms(uint32_t ms)
+{
+    for(uint32_t i = 0; i < ms; i++) {
+        for(uint32_t j = 0; j < 7200; j++) 
+		{  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½Ð£×¼
+            __asm__("nop");
         }
-        return;  // Ð£×¼ÆÚ¼ä²»¸üÐÂyaw
     }
-    
-    // ¼ÆËãZÖáÊµ¼Ê½ÇËÙ¶È£¨¡ã/s£©=£¨Ô­Ê¼Êý¾Ý/×ª»»ÏµÊý£©- ÁãÆ«
-    float raw_gz_deg = ((float)GZ / GYRO_SCALE_FACTOR) - gyro_offset_z;
-    
-    // ÇáÁ¿µÍÍ¨ÂË²¨£¨¼õÉÙÔëÉù£©
-    static float filtered_gz = 0.0f;
-    filtered_gz = 0.2f * filtered_gz + 0.8f * raw_gz_deg;  // ÐÂÊý¾ÝÈ¨ÖØ80%
-    
-    // »ý·Ö¼ÆËãyaw½Ç£¨ÀÛ»ý½Ç¶È£©
-    yaw += filtered_gz * dt;
+
 }
 
-/**
- * Çå³ýyaw½Ç£¨ÖØÖÃÀÛ»ýÖµ£©
- */
-void Clear_yaw(void)
-{
-    yaw = 0.0f;
-}
+

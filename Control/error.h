@@ -2,10 +2,10 @@
 #define	__ERROR_H
 
 #include "sensor.h"	   
-/*-------------Êý×Ö¶Ë¿Ú----------------*/
-int Error_Calcaulate(void);
+/*-------------ï¿½ï¿½ï¿½Ö¶Ë¿ï¿½----------------*/
+float Error_Calcaulate(void);
 extern int err;
-int get_fused_error(int sensor_err, float gyro_z);
+float get_fused_error(float sensor_err, float gyro_z);
 float Right_err(void);
-
+float low_pass_filter(float input, float alpha);
 #endif 

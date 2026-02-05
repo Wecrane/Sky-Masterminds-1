@@ -1,102 +1,109 @@
 #include "myfile.h"
 #include "sensor.h"
 
-/************************å‚æ•°é…ç½®***************************/
-#define SENSOR_NUM 5									 //ä¼ æ„Ÿå™¨æ•°é‡
-#define SENSOR_MAX_ERR      50    		// æœ€å¤§é™åˆ¶è¯¯å·®
-#define GYRO_SCALE       	  3.5f 			// 
-#define FUSION_ALPHA        0.92f		  // 
-#define DT                  0.005f 	 	// 
-#define SCALE_FACTOR 10							  // 
+/************************´«¸ĞÆ÷Îó²î¼ÆËã***************************/
+// ĞÂÔö½á¹¹ÌåºÍºê¶¨Òå£¨·ÅÔÚÎÄ¼ş¿ªÍ·£©
+#define SENSOR_NUM 5									 //´«¸ĞÆ÷ÊıÁ¿
 
-//ç”µè·¯å›¾çš„æƒé‡ï¼ˆæ—§ä»£ç ä¿ç•™ï¼‰
-#define L22  -2.8*L2
-#define L11  -1.3*L1
-#define MM   0*M
-#define R11  1.3*R1
-#define R22  2.8*R2
-
-/* **************** ç»“æ„ä½“ **************** */
-typedef struct 
+/* **************** ½á¹¹Ìå **************** */
+typedef struct   //ÓÃÓÚ¶¨Òå½á¹¹ÌåÀàĞÍ¡£½á¹¹ÌåÊÇÒ»ÖÖÓÃ»§×Ô¶¨ÒåµÄÊı¾İÀàĞÍ£¬¿ÉÒÔ½«¶à¸öÊı¾İÏî£¨³ÉÔ±£©×éºÏÔÚÒ»Æğ¡£ÔÚÕâÀï£¬typedef ÊÇ½«½á¹¹Ìå¶¨ÒåµÄÀàĞÍÃüÃûÎª SensorMap£¬ÒÔ±ãºóĞøÊ¹ÓÃ¡£
 {
-    float integrated_err; 
-    int last_sensor_err;  
-} FusionState;
+    float Angle;  // ´«¸ĞÆ÷Î»ÖÃ×ø±ê£¨ÏßĞÔ·Ö²¼£©
+    float channel;  // ´«¸ĞÆ÷¶ÔÓ¦µÄÍ¨µÀºÅ
+} SensorAngle;
 
-typedef struct   
+typedef struct   //ÓÃÓÚ¶¨Òå½á¹¹ÌåÀàĞÍ¡£½á¹¹ÌåÊÇÒ»ÖÖÓÃ»§×Ô¶¨ÒåµÄÊı¾İÀàĞÍ£¬¿ÉÒÔ½«¶à¸öÊı¾İÏî£¨³ÉÔ±£©×éºÏÔÚÒ»Æğ¡£ÔÚÕâÀï£¬typedef ÊÇ½«½á¹¹Ìå¶¨ÒåµÄÀàĞÍÃüÃûÎª SensorMap£¬ÒÔ±ãºóĞøÊ¹ÓÃ¡£
 {
-    float position;  
-    float channel;  
-} SensorMap;
+    float Angle;  
+    float error;  
+	float ALPHA;
+	uint16_t times;  //·Å´ó±¶Êı£¬¹éÒ»»¯µ½100 -100Ö®¼ä
+} FusedAngle; 
 
-/* **************** å…¨å±€å˜é‡ **************** */
-static FusionState fstate = {0, 0};
-int i1,i2,i3,i4,i5,err=0;
 
-// ä¼ æ„Ÿå™¨é€šé“ä¸æƒé‡æ˜ å°„
-// channel å¯¹åº” digital() å‡½æ•°çš„å‚æ•°: 1=L2, 2=L1, 3=M, 4=R1, 5=R2
-static const SensorMap sensorMap[SENSOR_NUM] = 
+static FusedAngle fusedSensor={0,0,0.7,10};  // ´´½¨fusedSensor±äÁ¿
+// ¸ù¾İ´«¸ĞÆ÷ÎïÀíÎ»ÖÃ¶¨Òå×ø±ê£¨¼ÙÉèÏßĞÔÅÅÁĞ£©
+static const SensorAngle sensorAngle[SENSOR_NUM] =   //Êı×éÊÇÒ»¸ö³£Á¿Êı×é£¬ÇÒÖ»ÄÜÔÚ¶¨ÒåËüµÄÎÄ¼ş»ò´úÂë¶ÎÄÚ·ÃÎÊ¡£const ±íÃ÷Êı×éÖĞµÄÔªËØÖµ²»¿ÉĞŞ¸Ä¡£
 {
-    {-6.0, 1}, // L2 (å·²å¢åŠ å¤–ä¾§æƒé‡ï¼Œä¾¿äºç›´è§’å…¥å¼¯)
-    {-1.3, 2}, // L1	
-    { 0, 3},   // M 
-    { 1.3, 4}, // R1
-    { 6.0, 5}  // R2 (å·²å¢åŠ å¤–ä¾§æƒé‡)
+    {-1.5, 1}, // L2
+    {-0.3, 2}, // L1	
+    { 0, 3}, // M 
+    { 0.3, 4}, // R1
+    { 1.5, 5}  // R2	
 };
 
 
-/* **************** è¯¯å·®è®¡ç®—æ ¸å¿ƒç®—æ³• **************** */
-int Error_Calcaulate()
+/* ****************¼ÆËã´«¸ĞÆ÷Æ«²î **************** */
+float Error_Calcaulate()
 {		
-	int active_sum = 0;
+	float active_sum = 0;
 	int active_count = 0;
-    int outer_sensor_triggered = 0; // æ ‡è®°æ˜¯å¦æœ‰å¤–ä¾§ä¼ æ„Ÿå™¨è§¦å‘
-
-	for (int i = 0; i < SENSOR_NUM; i++) 		
+	float err=0;
+	 for (int i = 0; i < SENSOR_NUM; i++) 		  
 	{
-        // digitalè¿”å›1ä»£è¡¨æ£€æµ‹åˆ°é»‘çº¿
-        if (digital((unsigned char)sensorMap[i].channel)) 
-        {
-            active_sum += (int)sensorMap[i].position; 
-            active_count++; 
-
-            // æ£€æŸ¥æ˜¯å¦ä¸ºæœ€å¤–ä¾§ä¼ æ„Ÿå™¨ (L2 index=0 æˆ– R2 index=4)
-            if (i == 0 || i == 4) {
-                outer_sensor_triggered = 1;
-            }
-        }
-    }
-	
-    // åŸºç¡€åŠ æƒå¹³å‡
-    err = active_count ? (active_sum * SCALE_FACTOR) / active_count : 0;
-    
-    // --- ç›´è§’/æ€¥å¼¯ç­–ç•¥ ---
-    // å¦‚æœå¤–ä¾§ä¼ æ„Ÿå™¨è§¦å‘ï¼Œè¯´æ˜å¤„äºå¼¯é“è¾¹ç¼˜ï¼Œéœ€è¦æå¤§çš„è½¬å‘åŠ›ã€‚
-    // éçº¿æ€§æ”¾å¤§è¯¯å·®
-    if (outer_sensor_triggered)
-    {
-        // æ”¾å¤§å€æ•°ï¼Œç¡®ä¿èƒ½å¤Ÿäº§ç”Ÿè¶³å¤Ÿçš„å·®é€Ÿ
-        err = (int)(err * 2.0f); 
-    }
-    
-	return err;           
+		if (digital(sensorAngle[i].channel))  		//digital µÄº¯Êı£¬´«Èë´«¸ĞÆ÷µÄÍ¨µÀºÅ¡£
+			{
+                active_sum += sensorAngle[i].Angle; // ÀÛ¼Ó¼¤»î´«¸ĞÆ÷µÄÎ»ÖÃ
+                active_count++; 				    //ÔÚÑ­»·ÖĞ£¬active_count »áÔÚÃ¿¸ö¼¤»îµÄ´«¸ĞÆ÷Ê±Ôö¼Ó 1£º
+			}
+    }	
+		err = active_sum / active_count;	//¼ÓÈ¨Æ½¾ù		
+		err = err*Right_err();	
+		if (active_count == 0) return 0;  // ´¦ÀíÎŞ´«¸ĞÆ÷Çé¿ö
+		return err;           
 }
 
 
-/* **************** è¿™ä¸ªå‡½æ•°ä¿ç•™åŸæ ·ï¼Œè™½ç„¶åªè¿”å› sensor_err **************** */
-int get_fused_error(int sensor_err, float gyro_z) 
-{
-    // ç›®å‰æ­¤å‡½æ•°ä»…é€ä¼  sensor_errï¼Œå¦‚æœéœ€è¦é™€èºä»ªèåˆå¯ä»¥åœ¨è¿™é‡Œæ‰“å¼€é€»è¾‘
-	return sensor_err;
+/* **************** ÍÓÂİÒÇ¸¨Öú¼ÆËã **************** */
+float get_fused_error(float sensor_err, float gyro_z) 
+{ 
+		static float last_gyro_z = 0;
+		float dt1=0.003f;
+	    fusedSensor.Angle += (last_gyro_z + gyro_z) / 2 * dt1;
+	    fusedSensor.Angle=Min_Max( fusedSensor.Angle,-10,10);
+		if(sensor_err!=0||digital(3)==1) 
+		{			
+		// Çé¿öA£ºÓĞ´«¸ĞÆ÷ĞÅºÅÊ±£¬ÖØÖÃ»ı·Ö£¬ÖØÖÃ·½Ê½Îª0.4µÄ´«¸ĞÆ÷0.6µÄÍÓÂİÒÇ¡£
+			
+			fusedSensor.Angle=fusedSensor.Angle * (1-fusedSensor.ALPHA) + (sensor_err*fusedSensor.ALPHA);	
+			fusedSensor.error=fusedSensor.Angle * (1-fusedSensor.ALPHA) + (sensor_err*fusedSensor.ALPHA)*fusedSensor.times;		
+	    }    		
+		
+		// Çé¿öB£ºÎŞ´«¸ĞÆ÷ĞÅºÅÊ±£¬ĞÅÈÎÍÓÂİÒÇ
+		else
+		{
+			//fusedSensor.error=fusedSensor.Angle*fusedSensor.times;//Ã»ÓĞ´«¸ĞÆ÷µÄÊ±ºò£¬ÍÓÂİÒÇÎª²»¶Ï»ı·Ö£¬Îó²îÒ»Ö±±ä´ó	 *fusedSensor.times		
+		}				
+		last_gyro_z  = gyro_z;		
+		fusedSensor.error=Min_Max(fusedSensor.error,-30,30);
+		fusedSensor.error=low_pass_filter(fusedSensor.error,0.5);
+		return fusedSensor.error;
 }
 
-/* **************** å…¼å®¹æ€§ä¿ç•™ **************** */
+
 float Right_err()
 {
-    // é€»è¾‘å·²ç»ç§»å…¥ Error_Calcaulate
-	return 1.0f;
+	 if(L2==0&&L1==1&&M==1&&R1==1&&R2==1){return 10.0f;}
+	 else if(L2==0&&L1==0&&M==1&&R1==1&&R2==1){return 4.0f;}
+	 
+     else if(L2==1&&L1==1&&M==1&&R1==1&&R2==0){return 10.0f;}
+	 else if(L2==1&&L1==1&&M==1&&R1==0&&R2==0){return 4.0f;}		 
+     else {return 1.0f;}
+	
 }
+/**
+ * @brief ´ø³õÊ¼»¯µÄÒ»½×µÍÍ¨ÂË²¨Æ÷
+ * @param input ÊäÈëÖµ
+ * @param alpha ÂË²¨ÏµÊı (0-1)
+ * @return ÂË²¨ºóµÄÊä³öÖµ
+ */
 
+float low_pass_filter(float input, float alpha)
+{
+    static float output = 0.0f;
+    output = alpha * input + (1.0f - alpha) * output;
+    return output;
+}
 
 
 

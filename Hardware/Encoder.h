@@ -8,5 +8,4 @@ int16_t Encoder_Get_R(void);
 void Encoder_Read(void);
 extern int Speed_L,Speed_R;
 extern float Location;
-extern float Location_per;
 #endif

@@ -126,10 +126,10 @@
 //}
 
 
-//void TIM3_IRQHandler(void)
+//void TIM2_IRQHandler(void)
 //{
 //	static uint16_t count;
-//	if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET)
+//	if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
 //	{	
 //		count++;		
 //		if(count>=50)			
@@ -137,7 +137,7 @@
 //			Speed_L=Encoder_Get_L();
 //			Speed_R=Encoder_Get_R();
 //		}
-//		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+//		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 //	}
 //}
 

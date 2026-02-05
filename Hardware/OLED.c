@@ -26,43 +26,6 @@
 #include <stdarg.h>
 
 /**
- * @brief 显示单个16x16汉字
- * @param X: 起始X坐标（0-127）
- * @param Y: 起始Y坐标（0-63）
- * @param Chinese: 要显示的汉字（UTF8编码）
- * @param FontSize: 字体大小（必须为OLED_16X16）
- */
-void OLED_ShowChinese(int16_t X, int16_t Y, const char *Chinese, uint8_t FontSize) {
-    if (FontSize != OLED_16X16) return;  // 仅支持16x16字体
-    
-    // 查找汉字在字模数组中的索引
-    uint16_t i = 0;
-    while (strlen(OLED_CF16x16[i].Index) > 0) {
-        if (strcmp(OLED_CF16x16[i].Index, Chinese) == 0) {
-            // 找到字模，开始绘制（16行，每行2字节）
-            for (uint8_t row = 0; row < 16; row++) {
-                uint8_t data_high = OLED_CF16x16[i].Data[2*row];     // 高8位
-                uint8_t data_low = OLED_CF16x16[i].Data[2*row + 1];  // 低8位
-                
-                // 绘制一行16个像素
-                for (uint8_t col = 0; col < 8; col++) {
-                    if (data_high & (0x80 >> col)) {
-                        OLED_DrawPoint(X + col, Y + row);
-                    }
-                }
-                for (uint8_t col = 0; col < 8; col++) {
-                    if (data_low & (0x80 >> col)) {
-                        OLED_DrawPoint(X + 8 + col, Y + row);
-                    }
-                }
-            }
-            return;
-        }
-        i++;
-    }
-    // 未找到字模时可添加默认处理（如显示空格）
-}
-/**
   * 数据存储格式：
   * 纵向8点，高位在下，先从左到右，再从上到下
   * 每一个Bit对应一个像素点

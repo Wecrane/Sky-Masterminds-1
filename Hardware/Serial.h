@@ -10,9 +10,6 @@ void Serial_SendString(char *String);
 void Serial_SendNumber(uint32_t Number, uint8_t Length);
 void Serial_Printf(char *format, ...);
 
-extern volatile char Serial_RxPacket[];
-extern volatile uint8_t Serial_RxPacketReady;
-
 uint8_t Serial_GetRxFlag(void);
 uint8_t Serial_GetRxData(void);
 

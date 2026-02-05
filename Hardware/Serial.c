@@ -1,38 +1,27 @@
 #include "myfile.h"
+#include "mode_control.h"
 
-#define SERIAL_RX_BUFFER_SIZE 100
-
-volatile uint8_t Serial_RxData;
-volatile uint8_t Serial_RxFlag;
-
-// 新增变量
-volatile char Serial_RxPacket[SERIAL_RX_BUFFER_SIZE];
-volatile uint8_t Serial_RxPacketReady = 0;
-static volatile uint8_t Serial_RxPacketIndex = 0;
-
-
+uint8_t Serial_RxData;
+uint8_t Serial_RxFlag;
 /************************串口初始化***************************/
 void Serial_Init(void)
 {
-	 // 开启 GPIOB 时钟
+    // 配置 GPIOB 时钟
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-    // 开启 AFIO 时钟（若后续使用重映射/AF功能）
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     
-    // 开启 USART3 时钟
+    // 配置 USART3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);    
 
     GPIO_InitTypeDef GPIO_InitStructure;
-    // PB10 TX
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP; 
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10; 
+    // TX - PB10 推挽输出
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
     
-    // PB11 RX
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11; 
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    // RX - PB11 上拉输入
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
     USART_InitTypeDef USART_InitStructure;
@@ -44,7 +33,10 @@ void Serial_Init(void)
     USART_InitStructure.USART_WordLength = USART_WordLength_8b;
     USART_Init(USART3, &USART_InitStructure);
 
-    // 配置 NVIC
+    // 配置接收中断
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+    
+    // 配置NVIC
     NVIC_InitTypeDef NVIC_InitStructure;
     NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
@@ -52,16 +44,13 @@ void Serial_Init(void)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 
-    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
-
     USART_Cmd(USART3, ENABLE);
 }
 
 void Serial_SendByte(uint8_t Byte)
 {
-    while (USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-    USART_SendData(USART3, Byte);
-    while (USART_GetFlagStatus(USART3, USART_FLAG_TC) == RESET);
+	USART_SendData(USART3, Byte);
+	while (USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
 }
 
 void Serial_SendArray(uint8_t *Array, uint16_t Length)
@@ -109,10 +98,10 @@ int fputc(int ch, FILE *f)
 
 void Serial_Printf(char *format, ...)
 {
-    char String[100];
+	char String[100];
 	va_list arg;
 	va_start(arg, format);
-    vsnprintf(String, sizeof(String), format, arg);
+	vsprintf(String, format, arg);
 	va_end(arg);
 	Serial_SendString(String);
 }
@@ -136,51 +125,12 @@ void USART3_IRQHandler(void)
 {
 	if (USART_GetITStatus(USART3, USART_IT_RXNE) == SET)
 	{
-		uint8_t RxData = (uint8_t)USART_ReceiveData(USART3);
-		
-        // 现有的单字节处理
-        Serial_RxData = RxData;
+		Serial_RxData = USART_ReceiveData(USART3);
 		Serial_RxFlag = 1;
-
-        // 字符串包处理 (\r 或 \n 结尾)
-        if (Serial_RxPacketReady == 0)
-        {
-            if (RxData == '\n' || RxData == '\r')
-            {
-                // 去除指令尾部的空格（防止指令为 "?   " 导致匹配失败）
-                while (Serial_RxPacketIndex > 0 && Serial_RxPacket[Serial_RxPacketIndex - 1] == ' ')
-                {
-                    Serial_RxPacketIndex--;
-                }
-                
-                Serial_RxPacket[Serial_RxPacketIndex] = '\0'; // 添加字符串结束符
-                Serial_RxPacketReady = 1;
-                Serial_RxPacketIndex = 0;
-            }
-            else
-            {
-                // 忽略指令开头的空格（防止上一条指令后的空格污染下一条指令）
-                if (Serial_RxPacketIndex == 0 && RxData == ' ')
-                {
-                    // do nothing
-                }
-                else
-                {
-                    if (Serial_RxPacketIndex < (SERIAL_RX_BUFFER_SIZE - 1))
-                    {
-                        Serial_RxPacket[Serial_RxPacketIndex] = RxData;
-                        Serial_RxPacketIndex++;
-                    }
-                    else
-                    {
-                        // 缓冲区溢出时丢弃当前包并重置
-                        Serial_RxPacketIndex = 0;
-                        Serial_RxPacket[0] = '\0';
-                    }
-                }
-            }
-        }
-
+		
+		// 蓝牙命令接收处理
+		BT_ReceiveChar(Serial_RxData);
+		
 		USART_ClearITPendingBit(USART3, USART_IT_RXNE);
 	}
 }

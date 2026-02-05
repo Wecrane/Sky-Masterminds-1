@@ -1,10 +1,12 @@
 #include "sensor.h"
 
+
+#define L2 digital(1)
 /*************************************
-*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½SENSOR_GPIO_Config
-*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½GPIOï¿½Ü½Åµï¿½ï¿½ï¿½ï¿½ï¿½
-*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-*Ëµï¿½ï¿½ï¿½ï¿½
+*º¯ÊıÃû³Æ£ºSENSOR_GPIO_Config
+*º¯Êı¹¦ÄÜ£ºGPIO¹Ü½ÅµÄÅäÖÃ
+*²ÎÊı£º
+*ËµÃ÷£º
 *			
 **************************************/
 void SENSOR_GPIO_Config(void)
@@ -20,40 +22,40 @@ void SENSOR_GPIO_Config(void)
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
     
-    // åˆå§‹åŒ– GPIOA Pin4, Pin5 (L2, L1) å’Œ Pin8, Pin11, Pin12
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_8 | GPIO_Pin_11 | GPIO_Pin_12;
+    // ??GPIOA?Pin8?Pin11?Pin12?????
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_12;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 }
 /*************************************
-*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½digtal
-*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½ï¿½ï¿½È¡XÍ¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
-*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-*Ëµï¿½ï¿½ï¿½ï¿½
+*º¯ÊıÃû³Æ£ºdigtal
+*º¯Êı¹¦ÄÜ£º»ñÈ¡XÍ¨µÀÊı×ÖÖµ
+*²ÎÊı£º
+*ËµÃ÷£º
 *			
 **************************************/
-unsigned char digital(unsigned char channel)//1-ADC_N	  ï¿½ï¿½È¡XÍ¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
+unsigned char digital(unsigned char channel)//1-ADC_N	  »ñÈ¡XÍ¨µÀÊı×ÖÖµ
 {
 	u8 value = 0;
 	switch(channel) 
 	{
 		case 1:  
-			if(PAin(4) == 1) value = 1;
+			if(PAin(4) == Color_Chice) value = 1;
 			else value = 0;  
 			break;  
 		case 2: 
-			if(PAin(5) == 1) value = 1;
+			if(PAin(5) == Color_Chice) value = 1;
 			else value = 0;  
 			break;  
 		case 3: 
-			if(PAin(12) == 1) value = 1;
+			if(PAin(12) == Color_Chice) value = 1;
 			else value = 0;  
 			break;   
 		case 4:  
-			if(PBin(0) == 1) value = 1;
+			if(PBin(0) == Color_Chice) value = 1;
 			else value = 0;  
 			break;   
 		case 5:
-			if(PBin(1) == 1) value = 1;
+			if(PBin(1) == Color_Chice) value = 1;
 			else value = 0;  
 			break;
 	}

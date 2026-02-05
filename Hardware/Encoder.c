@@ -4,7 +4,6 @@
 int Speed_L,Speed_R,Speed_L_Temp,Speed_R_Temp;
 float Speed_Smooth=0.2; 
 float Location=0.0f;
-float Location_per=0.0f;
 float Real_Distance=0.0093940817285f;			//这里是自己实际推算出来的
 
 void Encoder_Init(void)
@@ -69,7 +68,7 @@ void Encoder_Init(void)
 
 int16_t Encoder_Get_L(void)
 {
-		int16_t Temp1;
+	int16_t Temp1;
     Temp1 = TIM_GetCounter(TIM4); // 先获取计数值
     Speed_L_Temp = Temp1;         // 再赋值给临时变量
     TIM_SetCounter(TIM4, 0);      // 重置计数器
@@ -95,7 +94,6 @@ void Encoder_Read()
 				Speed_R=Speed_R*Speed_Smooth+Speed_R_Temp*(1-Speed_Smooth);
 	
 				Location+=(Speed_L+Speed_R)*Real_Distance;
-				Location_per+=(Speed_L+Speed_R)*Real_Distance;
 }
 
 void Clear_Location(void) 

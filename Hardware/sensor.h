@@ -3,6 +3,8 @@
 
 #include "sys.h"
 #include "stm32f10x.h"	   
+#define Color_Chice 1	//白底黑线选1 黑底白线选0 蓝底白线选 0
+
 
 /*-------------数字端口----------------*/
 #define L2 digital(1)
