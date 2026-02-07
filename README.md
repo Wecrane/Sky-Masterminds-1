@@ -92,6 +92,6 @@ Sky-Masterminds-1/
 
 ## Credits
 
-开源代码参考：B站 @江科大胡不才
+代码参考：B站 @芋头鱼
 修改维护：Wecrane
 更新日期：2026-02-05
