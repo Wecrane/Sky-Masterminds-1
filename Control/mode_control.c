@@ -16,9 +16,11 @@ static int BT_TurnSpeed = 30;   // 转向速度
 static char cmd_buffer[CMD_BUFFER_SIZE];
 static uint8_t cmd_index = 0;
 
-// 命令就绪标志和解析缓冲区（避免在中断中调用Serial_Printf导致卡死）
-static volatile uint8_t cmd_ready = 0;
-static char parse_buffer[CMD_BUFFER_SIZE];
+// 命令队列（环形缓冲），解决命令密集发送导致丢失的问题
+#define CMD_QUEUE_DEPTH 5
+static char cmd_queue[CMD_QUEUE_DEPTH][CMD_BUFFER_SIZE];
+static volatile uint8_t queue_write_idx = 0;
+static volatile uint8_t queue_read_idx = 0;
 
 /*=============================================================================
  * 模式初始化
@@ -31,9 +33,13 @@ void Mode_Init(void)
     BT_Turn = 0;
     BT_TurnSpeed = 30;
     cmd_index = 0;
-    cmd_ready = 0;
+    
+    // 初始化队列
+    queue_write_idx = 0;
+    queue_read_idx = 0;
+    memset(cmd_queue, 0, sizeof(cmd_queue));
+    
     memset(cmd_buffer, 0, CMD_BUFFER_SIZE);
-    memset(parse_buffer, 0, CMD_BUFFER_SIZE);
 }
 
 /*=============================================================================
@@ -379,15 +385,22 @@ void BT_Command_Parse(char *cmd)
  *===========================================================================*/
 void BT_ReceiveChar(uint8_t ch)
 {
-    // 收到换行或回车，设置命令就绪标志
+    // 收到换行或回车，处理命令
     if (ch == '\n' || ch == '\r')
     {
-        if (cmd_index > 0 && cmd_ready == 0)  // 上一条命令已处理完才接收新命令
+        if (cmd_index > 0)
         {
-            cmd_buffer[cmd_index] = '\0';
-            // 复制到解析缓冲区
-            strncpy(parse_buffer, cmd_buffer, CMD_BUFFER_SIZE);
-            cmd_ready = 1;  // 设置标志，由主循环处理
+            // 计算下一个写入位置
+            uint8_t next_write_idx = (queue_write_idx + 1) % CMD_QUEUE_DEPTH;
+            
+            // 如果队列未满，将命令加入队列
+            if (next_write_idx != queue_read_idx)
+            {
+                cmd_buffer[cmd_index] = '\0';
+                strncpy(cmd_queue[queue_write_idx], cmd_buffer, CMD_BUFFER_SIZE);
+                queue_write_idx = next_write_idx;
+            }
+            // 队列已满则丢弃
         }
         // 重置接收缓冲区
         cmd_index = 0;
@@ -418,10 +431,14 @@ void BT_ReceiveChar(uint8_t ch)
  *===========================================================================*/
 void BT_ProcessCommand(void)
 {
-    if (cmd_ready)
+    // 如果队列非空（读写指针不相等）
+    if (queue_read_idx != queue_write_idx)
     {
-        BT_Command_Parse(parse_buffer);
-        cmd_ready = 0;
+        // 处理当前命令
+        BT_Command_Parse(cmd_queue[queue_read_idx]);
+        
+        // 移动读指针
+        queue_read_idx = (queue_read_idx + 1) % CMD_QUEUE_DEPTH;
     }
 }
 
